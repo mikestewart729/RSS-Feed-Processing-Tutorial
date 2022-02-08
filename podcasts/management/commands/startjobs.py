@@ -1,8 +1,21 @@
 # podcasts/management/commands/startjobs.py
 
-import feedparser
+#Standard library
+import logging
+
+# Django
+from django.conf import settings
 from django.core.management.base import BaseCommand
+
+# Third party
+import feedparser
 from dateutil import parser
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+from django_apscheduler.jobstores import DjangoJobStore
+from django_apscheduler.models import DjangoJobExecution
+
+# Models
 from podcasts.models import Episode
 
 # From stackexchange
@@ -11,6 +24,8 @@ if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 
 # Back to tutorial
+logger = logging.getLogger(__name__)
+
 def save_new_episodes(feed):
     """
     Saves new episodes to the database. Checks against the guid of episodes currently
@@ -51,8 +66,62 @@ def fetch_bastards_episodes():
     _feed = feedparser.parse("https://feeds.megaphone.fm/behindthebastards")
     save_new_episodes(_feed)
 
+def delete_old_job_executions(max_age=604_800):
+    """ Deletes execution logs older than max_age. """
+    DjangoJobExecution.objects.delete_old_job_executions(max_age)
+
 class Command(BaseCommand):
+    help = 'Runs apscheduler.'
+
     def handle(self, *args, **options):
-        fetch_ywa_episodes()
-        fetch_maintenancephase_episodes()
-        fetch_bastards_episodes()
+        scheduler = BlockingScheduler(timezone=settings.TIME_ZONE)
+        scheduler.add_jobstore(DjangoJobStore(), "default")
+
+        scheduler.add_job(
+            fetch_ywa_episodes,
+            trigger="interval",
+            minutes=2,
+            id="You're Wrong About Podcast",
+            max_instances=1,
+            replace_existing=True,
+        )
+        logger.info("Added job: You're Wrong About Podcast.")
+
+        scheduler.add_job(
+            fetch_maintenancephase_episodes,
+            trigger="interval",
+            minutes=2,
+            id="Maintenance Phase Podcast",
+            max_instances=1,
+            replace_existing=True,
+        )
+        logger.info("Added job: Maintenance Phase Podcast.")
+
+        scheduler.add_job(
+            fetch_bastards_episodes,
+            trigger="interval",
+            minutes=2,
+            id="Behind the Bastards Podcast",
+            max_instances=1,
+            replace_existing=True,
+        )
+        logger.info("Added job: Behind the Bastards Podcast.")
+
+        scheduler.add_job(
+            delete_old_job_executions,
+            trigger=CronTrigger(
+                day_of_week="mon", hour="00", minute="00"
+            ),
+            id="Delete old job executions",
+            max_instances=1,
+            replace_existing=True,
+        )
+        logger.info("Added job: Delete old job executions.")
+
+        try:
+            logger.info("Starting scheduler...")
+            scheduler.start()
+        except KeyboardInterrupt:
+            logger.info("Stopping scheduler...")
+            scheduler.shutdown()
+            logger.info("Scheduler shut down successfully!")

@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # My apps,
-    'podcasts.apps.PodcastsConfig'
+    'podcasts.apps.PodcastsConfig',
+    # Third Party Apps
+    "django_apscheduler",
 ]
 
 MIDDLEWARE = [
@@ -126,3 +128,17 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
