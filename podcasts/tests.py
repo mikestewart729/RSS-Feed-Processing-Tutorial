@@ -2,6 +2,7 @@
 
 from django.test import TestCase
 from django.utils import timezone
+from django.urls.base import reverse
 from .models import Episode
 
 class PodcastsTests(TestCase):
@@ -27,3 +28,16 @@ class PodcastsTests(TestCase):
         self.assertEqual(
             str(self.episode), "My Python Podcast: My Awesome Podcast Episode"
         )
+
+    def test_homepage_status_code(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_homepage_uses_correct_template(self):
+        response = self.client.get(reverse("homepage"))
+        self.assertTemplateUsed(response, "homepage.html")
+
+    def test_homepage_list_contents(self):
+        response = self.client.get(reverse("homepage"))
+        # print(response.content)
+        self.assertContains(response, "My Awesome Podcast Episode")
